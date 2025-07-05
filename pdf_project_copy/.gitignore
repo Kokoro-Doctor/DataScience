@@ -1,0 +1,6 @@
+chroma_db/
+book/
+.env
+myvenv/
+*.webp
+
