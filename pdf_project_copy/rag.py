@@ -20,7 +20,6 @@ from langchain_core.output_parsers import StrOutputParser
 load_dotenv()
 
 # working with pdf
-def loading_pdf():
 file_path = "book\Introduction.to.Algorithms.4th.Edition.pdf"
 loader = PyMuPDFLoader(file_path)
 data= loader.load()
