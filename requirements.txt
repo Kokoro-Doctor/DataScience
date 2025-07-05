@@ -1,0 +1,12 @@
+langchain
+langchain-community
+pdfminer.six
+sentence-transformers
+transformers
+chromadb
+python-dotenv
+tqdm
+chromadb
+streamlit
+langchain_huggingface
+langchain_ollama
