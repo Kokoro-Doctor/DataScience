@@ -1,0 +1,3 @@
+# Ignore ChromaDB vector store and data folder
+chromadb_store/
+data/
