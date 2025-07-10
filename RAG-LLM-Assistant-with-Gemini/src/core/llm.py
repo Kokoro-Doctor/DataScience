@@ -9,7 +9,7 @@ from langchain_google_genai import GoogleGenerativeAI
 class GeminiLLM(LLM):
     """Custom Gemini LLM wrapper for LangChain."""
     
-    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash", **kwargs):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.5-pro", **kwargs):
         """Initialize the Gemini LLM wrapper.
         
         Args:

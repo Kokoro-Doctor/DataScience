@@ -13,7 +13,7 @@ class Config:
     
     # API Configuration
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    MODEL_NAME = os.getenv("MODEL_NAME", "gemini-1.5-flash")
+    MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-pro")
     
     # Database Configuration
     DEFAULT_PERSIST_DIR = "./chroma_db"
@@ -37,6 +37,12 @@ class Config:
     # UI Configuration
     APP_TITLE = "RAG LLM Assistant"
     APP_ICON = "🤖"
+    
+    # Chat History Configuration
+    CHAT_HISTORY_ENABLED = os.getenv("CHAT_HISTORY_ENABLED", "true").lower() == "true"
+    MAX_CHAT_HISTORY_CONTEXT = int(os.getenv("MAX_CHAT_HISTORY_CONTEXT", "5"))
+    FEEDBACK_ENABLED = os.getenv("FEEDBACK_ENABLED", "true").lower() == "true"
+    FEEDBACK_WEIGHT = float(os.getenv("FEEDBACK_WEIGHT", "0.2"))
     
     @classmethod
     def validate_config(cls):
