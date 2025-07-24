@@ -31,10 +31,7 @@ class RAGSystem:
         self.llm = GeminiLLM(api_key, self.config.MODEL_NAME)
         
         # Initialize embeddings
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name=self.config.EMBEDDING_MODEL,
-            model_kwargs={'device': self.config.EMBEDDING_DEVICE}
-        )
+        self.embeddings = self._initialize_embeddings_robust()
         
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -52,6 +49,68 @@ class RAGSystem:
         self.qa_chain = None
         self.sources = []
         
+    def _initialize_embeddings_robust(self):
+        """Initialize embeddings with multiple fallback strategies."""
+        embedding_strategies = [
+            # Strategy 1: Use configured device
+            {
+                'model_name': self.config.EMBEDDING_MODEL,
+                'model_kwargs': {'device': self.config.EMBEDDING_DEVICE},
+                'description': f"Using {self.config.EMBEDDING_DEVICE} device"
+            },
+            # Strategy 2: Force CPU
+            {
+                'model_name': self.config.EMBEDDING_MODEL,
+                'model_kwargs': {'device': 'cpu'},
+                'description': "Falling back to CPU"
+            },
+            # Strategy 3: No device specification
+            {
+                'model_name': self.config.EMBEDDING_MODEL,
+                'model_kwargs': {},
+                'description': "Using default device"
+            },
+            # Strategy 4: Different model on CPU
+            {
+                'model_name': "sentence-transformers/all-MiniLM-L6-v2",
+                'model_kwargs': {'device': 'cpu'},
+                'description': "Using fallback model on CPU"
+            },
+            # Strategy 5: Minimal configuration
+            {
+                'model_name': "sentence-transformers/all-MiniLM-L6-v2",
+                'model_kwargs': {},
+                'description': "Using minimal configuration"
+            }
+        ]
+        
+        for i, strategy in enumerate(embedding_strategies):
+            try:
+                if i > 0:  # Show warning for fallback strategies
+                    st.warning(f"⚠️ {strategy['description']}")
+                
+                embeddings = HuggingFaceEmbeddings(
+                    model_name=strategy['model_name'],
+                    model_kwargs=strategy['model_kwargs']
+                )
+                
+                if i == 0:
+                    st.success(f"✅ Embeddings initialized successfully with {strategy['description']}")
+                else:
+                    st.info(f"✅ Embeddings initialized with fallback: {strategy['description']}")
+                
+                return embeddings
+                
+            except Exception as e:
+                if i == len(embedding_strategies) - 1:  # Last strategy failed
+                    st.error(f"❌ All embedding initialization strategies failed. Last error: {str(e)}")
+                    raise e
+                else:
+                    st.warning(f"⚠️ Strategy {i+1} failed: {str(e)[:100]}...")
+                    continue
+        
+        raise RuntimeError("Failed to initialize embeddings with any strategy")
+    
     def setup_vectorstore(self, persist_directory: Optional[str] = None):
         """Initialize or load existing ChromaDB.
         

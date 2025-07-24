@@ -24,7 +24,7 @@ class Config:
     
     # Embeddings Configuration
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu")
+    EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu")  # Default to CPU to avoid meta tensor issues
     
     # Retrieval Configuration
     RETRIEVAL_K = int(os.getenv("RETRIEVAL_K", "5"))
