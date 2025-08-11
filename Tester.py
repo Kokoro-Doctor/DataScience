@@ -60,300 +60,6 @@ def generate_combined_report(candidate, results):
     html += "</ul></body></html>"
     return txt, md, html
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity as cosine_sim
-import numpy as np
-
-def hybrid_similarity(candidate_answer, ideal_answer):
-    """
-    Combines TF-IDF cosine similarity with a semantic embedding similarity.
-    Returns a score between 0 and 1.
-    """
-
-    # --- TF-IDF Cosine ---
-    vectorizer = TfidfVectorizer()
-    tfidf_matrix = vectorizer.fit_transform([ideal_answer, candidate_answer])
-    cosine_score = cosine_sim(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-
-    # --- Semantic Embeddings ---
-    try:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        embeddings = model.encode([ideal_answer, candidate_answer])
-        semantic_score = cosine_sim(
-            [embeddings[0]],
-            [embeddings[1]]
-        )[0][0]
-    except Exception:
-        semantic_score = cosine_score  # fallback
-
-    # Weighted score (adjust as needed)
-    final_score = round((0.5 * cosine_score) + (0.5 * semantic_score), 3)
-    return final_score
-
-def minillm_grade(candidate_answer, ideal_answer):
-    """
-    Uses a lightweight LLM like MiniLLM to semantically grade the answer.
-    Returns (score between 0-1, reasoning string).
-    """
-    import openai  # or your chosen MiniLLM client
-
-    prompt = f"""
-    You are an interview evaluator.
-    Compare the candidate's answer to the ideal answer.
-    Candidate Answer: {candidate_answer}
-    Ideal Answer: {ideal_answer}
-
-    Give:
-    - A numeric score from 0 to 1 (1 = perfect answer, 0 = completely wrong)
-    - A short reasoning (max 2 sentences).
-    Format: SCORE: <score>
-    REASON: <reason>
-    """
-
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # Replace with your MiniLLM API
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    content = response.choices[0].message.content.strip()
-
-    # Extract score & reasoning
-    score_line = [line for line in content.split("\n") if "SCORE:" in line]
-    reason_line = [line for line in content.split("\n") if "REASON:" in line]
-
-    score = float(score_line[0].split(":")[1].strip()) if score_line else 0
-    reason = reason_line[0].split(":", 1)[1].strip() if reason_line else "No reason provided."
-
-    return score, reason
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity as cosine_sim
-import numpy as np
-
-def hybrid_similarity(candidate_answer, ideal_answer):
-    """
-    Combines TF-IDF cosine similarity with a semantic embedding similarity.
-    Returns a score between 0 and 1.
-    """
-    vectorizer = TfidfVectorizer()
-    tfidf_matrix = vectorizer.fit_transform([ideal_answer, candidate_answer])
-    cosine_score = cosine_sim(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-
-    try:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        embeddings = model.encode([ideal_answer, candidate_answer])
-        semantic_score = cosine_sim([embeddings[0]], [embeddings[1]])[0][0]
-    except Exception:
-        semantic_score = cosine_score
-
-    final_score = round((0.5 * cosine_score) + (0.5 * semantic_score), 3)
-    return final_score
-
-def minillm_grade(candidate_answer, ideal_answer):
-    """
-    Placeholder MiniLLM scoring.
-    Replace this with actual API call or local inference.
-    """
-    try:
-        # Example: simple keyword matching fallback
-        overlap = len(set(candidate_answer.lower().split()) & set(ideal_answer.lower().split()))
-        ratio = overlap / max(1, len(set(ideal_answer.lower().split())))
-        score = round(ratio, 3)
-        reason = f"Overlap ratio: {score}"
-        return score, reason
-    except Exception as e:
-        return 0, f"Error in MiniLLM scoring: {e}"
-    
-from gpt4all import GPT4All
-import os
-
-# Path to your local model
-MODEL_PATH = os.path.join("models", "ggml-gpt4all-j-v1.3-groovy.bin")
-
-# Load the local model once at startup
-local_llm = GPT4All(MODEL_PATH)
-
-def generate_questions_and_ideals(jd_section, qtype, n=5):
-    """
-    Generates N questions + ideal answers from a JD section and question type.
-    Uses the local GPT4All model.
-    """
-    prompt = f"""
-    You are an expert interviewer. Based on the following job description section:
-
-    {jd_section}
-
-    Generate {n} {qtype} interview questions.
-    For each question, also provide a short (2–3 sentence) ideal answer.
-    Format your response as:
-    Q1: <question>
-    Ideal: <ideal answer>
-    Q2: ...
-    """
-    output = local_llm.prompt(prompt, max_tokens=500)
-
-    questions, ideals = [], []
-    for line in output.split("\n"):
-        if line.strip().startswith("Q"):
-            q_text = line.split(":", 1)[-1].strip()
-            questions.append(q_text)
-        elif line.strip().lower().startswith("ideal"):
-            ideal_text = line.split(":", 1)[-1].strip()
-            ideals.append(ideal_text)
-
-    return questions[:n], ideals[:n]
-
-
-def llm_grade_answer(candidate_answer, ideal_answer):
-    """
-    Uses local GPT4All to grade a candidate answer against an ideal answer.
-    Returns score (0–1), reasoning, and optionally a better suggested answer.
-    """
-    prompt = f"""
-    Compare the following candidate answer to the ideal answer.
-
-    Ideal Answer: {ideal_answer}
-    Candidate Answer: {candidate_answer}
-
-    Give a score between 0 and 1 (1 = perfect match, 0 = totally wrong).
-    Then explain in 1–2 sentences why.
-
-    Format:
-    Score: <number>
-    Reason: <text>
-    BestAnswer: <optional improved answer>
-    """
-    output = local_llm.prompt(prompt, max_tokens=300)
-
-    score, reason, best = 0, "", ""
-    for line in output.split("\n"):
-        if line.lower().startswith("score"):
-            try:
-                score = float(line.split(":")[1].strip())
-            except:
-                score = 0
-        elif line.lower().startswith("reason"):
-            reason = line.split(":", 1)[-1].strip()
-        elif line.lower().startswith("bestanswer"):
-            best = line.split(":", 1)[-1].strip()
-
-    return score, reason, best
-
-# ---- Ollama helpers (paste near your imports) ----
-try:
-    import ollama
-    OLLAMA_AVAILABLE = True
-except Exception:
-    OLLAMA_AVAILABLE = False
-
-def generate_questions_and_ideals_ollama(jd_section, qtype, n=5, model="mistral"):
-    """
-    Generate n questions and short ideal answers from jd_section using Ollama.
-    Returns (questions_list, ideals_list). Falls back to keyword generator if Ollama not available or parse fails.
-    """
-    # fallback generator if Ollama not present
-    if not OLLAMA_AVAILABLE:
-        qs = generate_keywords_qs(jd_section, qtype, n, use_hardcoded=False)
-        ideals = [f"Short ideal answer: {q}" for q in qs]
-        return qs, ideals
-
-    prompt = f"""
-You are an expert interviewer. Based on the job description excerpt below, create {n} {qtype} interview questions.
-For each question provide a short ideal answer (1-3 sentences).
-Format exactly (one Q/A per block):
-
-Q1: <question>
-A1: <ideal answer>
-
-Q2: ...
-"""
-    try:
-        res = ollama.chat(model=model, messages=[{"role":"user","content":prompt}])
-        text = res["message"]["content"].strip()
-    except Exception as e:
-        # fallback
-        qs = generate_keywords_qs(jd_section, qtype, n, use_hardcoded=False)
-        ideals = [f"Short ideal answer: {q}" for q in qs]
-        return qs, ideals
-
-    questions, ideals = [], []
-    for line in text.splitlines():
-        line = line.strip()
-        if re.match(r"^q\d+\s*:", line.lower()):
-            q = line.split(":",1)[1].strip()
-            questions.append(q)
-        elif re.match(r"^a\d+\s*:", line.lower()):
-            a = line.split(":",1)[1].strip()
-            ideals.append(a)
-
-    # Try block parsing if counts mismatch
-    if not questions or len(questions) != len(ideals):
-        questions, ideals = [], []
-        blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
-        for b in blocks:
-            qline = next((l for l in b.splitlines() if l.lower().startswith("q")), None)
-            aline = next((l for l in b.splitlines() if l.lower().startswith("a")), None)
-            if qline and aline:
-                questions.append(qline.split(":",1)[1].strip())
-                ideals.append(aline.split(":",1)[1].strip())
-
-    if not questions:
-        qs = generate_keywords_qs(jd_section, qtype, n, use_hardcoded=False)
-        ideals = [f"Short ideal answer: {q}" for q in qs]
-        return qs, ideals
-
-    return questions[:n], ideals[:n]
-
-
-def llm_grade_answer_ollama(candidate_answer, ideal_answer, model="mistral"):
-    """
-    Use Ollama to grade candidate_answer vs ideal_answer.
-    Returns (llm_score_float_between_0_1, reason_str, best_answer_str).
-    Fallback: simple overlap heuristic.
-    """
-    if not OLLAMA_AVAILABLE:
-        overlap = len(set(candidate_answer.lower().split()) & set(ideal_answer.lower().split()))
-        denom = max(1, len(set(ideal_answer.lower().split())))
-        ratio = overlap / denom
-        return round(ratio, 3), f"Overlap fallback: {ratio:.3f}", ideal_answer
-
-    prompt = f"""
-Compare the Candidate Answer to the Ideal Answer below.
-
-Ideal Answer:
-{ideal_answer}
-
-Candidate Answer:
-{candidate_answer}
-
-Output EXACTLY these three labeled lines (no extra chatter):
-SCORE: <number between 0 and 1>
-REASON: <one-sentence explanation>
-BEST_ANSWER: <a concise 1-2 sentence improved ideal answer>
-"""
-    try:
-        res = ollama.chat(model=model, messages=[{"role":"user","content":prompt}])
-        out = res["message"]["content"].strip()
-    except Exception as e:
-        return 0.0, f"LLM error: {e}", ideal_answer
-
-    score, reason, best = 0.0, "", ""
-    for line in out.splitlines():
-        low = line.strip().lower()
-        if low.startswith("score:"):
-            try:
-                score = float(line.split(":",1)[1].strip())
-            except:
-                score = 0.0
-        elif low.startswith("reason:"):
-            reason = line.split(":",1)[1].strip()
-        elif low.startswith("best_answer:") or low.startswith("bestanswer:"):
-            best = line.split(":",1)[1].strip()
-    score = max(0.0, min(1.0, float(score if score else 0.0)))
-    return round(score, 3), reason, best
-
 # ========== Page Setup ==========
 for key in [
     "questions", "scores", "ideal", "cand", "jd", "section", "role",
@@ -388,8 +94,7 @@ def init_db():
         password_hash TEXT,
         role TEXT
     )""")
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS interviews (
+    c.execute("""CREATE TABLE IF NOT EXISTS interviews (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         candidate TEXT,
         timestamp TEXT,
@@ -397,12 +102,9 @@ def init_db():
         questions TEXT,
         ideal TEXT,
         answers TEXT,
-        scores TEXT,
-        verdicts TEXT,
-        feedback TEXT
-    )
-""")
-    ensure_column_exists("interviews", "verdicts", "TEXT")
+        scores TEXT
+        -- NOTE: Don't include feedback here if your DB already exists
+    )""")
     conn.commit()
     conn.close()
 
@@ -538,32 +240,6 @@ def score_similarity(expected, actual):
     return cosine_similarity(vecs[0], vecs[1])[0][0]
 
 from difflib import SequenceMatcher
-def get_answer_verdict(candidate_answer, ideal_answer, score_threshold=0.75):
-    sim = score_similarity(ideal_answer, candidate_answer)
-    copied_score = SequenceMatcher(None, candidate_answer.lower(), ideal_answer.lower()).ratio()
-
-    if not candidate_answer.strip():
-        verdict = "No Answer"
-        explanation = "The candidate didn't provide any answer."
-    elif copied_score > 0.85:
-        verdict = "Copied"
-        explanation = "The candidate's answer is nearly identical to the expected answer. Likely copied."
-    elif sim >= score_threshold:
-        verdict = "Correct"
-        explanation = "The candidate's answer is accurate and well aligned with the expected answer."
-    elif 0.4 <= sim < score_threshold:
-        verdict = "Partially Correct"
-        explanation = "The answer is somewhat correct but missing key elements or details."
-    else:
-        verdict = "Incorrect"
-        explanation = "The answer does not match the expected response and contains factual or conceptual errors."
-
-    return {
-        "similarity": round(sim, 2),
-        "copied_score": round(copied_score, 2),
-        "verdict": verdict,
-        "explanation": explanation
-    }
 
 def highlight_difference(expected, actual):
     matcher = SequenceMatcher(None, expected.lower(), actual.lower())
@@ -574,17 +250,12 @@ def highlight_difference(expected, actual):
         if match.size > 5:
             common.append(expected[match.a: match.a + match.size])
 
+    missed = []
     expected_words = set(expected.lower().split())
     actual_words = set(actual.lower().split())
+    missed = list(expected_words - actual_words)
 
-    missing_from_candidate = expected_words - actual_words   # 🟡 Gaps (not mentioned)
-    wrong_in_candidate = actual_words - expected_words        # 🔴 Extra / wrong info
-
-    return (
-        ", ".join(set(common)), 
-        ", ".join(missing_from_candidate), 
-        ", ".join(wrong_in_candidate)
-    )
+    return ", ".join(set(common)), ", ".join(set(missed))
 
 def extract_key_phrases(text):
     kw_extractor = yake.KeywordExtractor(lan="en", top=10)
@@ -641,17 +312,15 @@ def save_interview(data):
     c = conn.cursor()
     ts = datetime.datetime.now().isoformat()
     c.execute("""
-    INSERT INTO interviews(candidate, timestamp, jd, questions, ideal, answers, scores, verdicts, feedback)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-""", (
-    data['candidate'], ts, data['jd'],
-    "\n".join(data['questions']),
-    "\n".join(data['ideal']),
-    "\n".join(data['answers']),
-    ",".join(f"{s:.2f}" for s in data['scores']),
-    "\n".join([v["verdict"] for v in data["verdicts"]]),
-    data.get('feedback', '')
-))
+        INSERT INTO interviews(candidate, timestamp, jd, questions, ideal, answers, scores, feedback) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (data['candidate'], ts, data['jd'],
+         "\n".join(data['questions']),
+         "\n".join(data['ideal']),
+         "\n".join(data['answers']),
+         ",".join(f"{s:.2f}" for s in data['scores']),
+         data.get('feedback',''))
+    )
     conn.commit()
     conn.close()
 
@@ -892,169 +561,89 @@ for i, q in enumerate(st.session_state.questions):
 
     answers.append(a or "")
 
-# ---- Full Grade & Save Interview block (replace your current one) ----
+# ✅ Now wrap the grading and feedback in the button click block
 if st.button("Grade & Save Interview", key="grade_btn"):
 
-    # 1) Generate dynamic Qs & Ideals if session doesn't already have them (or you prefer regen)
-    jd_for_generation = st.session_state.get("jd") or st.session_state.get("section") or ""
-    qtype_for_generation = st.session_state.get("qtype") or "Mixed"
-    desired_n = st.session_state.get("qcount", len(st.session_state.questions) or 5)
+    tfidf_scores, highlights = [], []
+    for q, a, ideal in zip(st.session_state.questions, answers, st.session_state.ideal):
+        score = score_similarity(ideal, a)
+        common, missed = highlight_difference(ideal, a)
+        tfidf_scores.append(score)
+        highlights.append({"common": common, "missed": missed})
 
-    try:
-        gen_qs, gen_ideals = generate_questions_and_ideals_ollama(jd_for_generation, qtype_for_generation, n=desired_n)
-        # optionally overwrite session questions/ideal so UI shows generated ones later
-        st.session_state.generated_questions = gen_qs
-        st.session_state.generated_ideals = gen_ideals
-        st.session_state.questions = gen_qs
-        st.session_state.ideal = gen_ideals
-    except Exception as e:
-        st.error(f"Question generation failed, using existing questions: {e}")
-        gen_qs = st.session_state.get("questions", [])
-        gen_ideals = st.session_state.get("ideal", [])
+    # Score Charts
+    st.subheader("📊 Score Summary")
+    
+    st.pyplot(plot_bar(tfidf_scores))
+    st.markdown("**Interpretation:** Each bar represents how close the candidate's answer is to the ideal. A taller bar (closer to 1.0) suggests higher alignment in content, structure, and relevance. Bars below 0.8 may indicate incomplete or off-topic answers.")
+    st.plotly_chart(plot_line(tfidf_scores))
+    st.markdown("**Interpretation:** This line chart tracks the candidate’s performance across questions. Sudden dips or spikes may signal inconsistency or strong/weak areas in knowledge.")
+    st.pyplot(plot_radar(tfidf_scores))
+    st.markdown("**Interpretation:** The radar chart visually shows strengths and gaps. Sharp drops in some dimensions could mean the candidate is underprepared on certain themes.")
 
-    # 2) Gather answers from session (textareas keys must match how you store them)
-    answers_list = []
-    # if the UI stores answers in keys like answer_q_0 ... answer_q_n:
-    for i in range(len(gen_qs)):
-        answers_list.append(st.session_state.get(f"answer_q_{i}", "").strip())
-
-    # ensure lengths align
-    if len(answers_list) < len(gen_qs):
-        answers_list += [""] * (len(gen_qs) - len(answers_list))
-    elif len(answers_list) > len(gen_qs):
-        answers_list = answers_list[:len(gen_qs)]
-
-    tfidf_scores, highlights, verdicts = [], [], []
-
-    # 3) Grade each answer
-    for idx, (q, a) in enumerate(zip(gen_qs, answers_list)):
-        ideal = gen_ideals[idx] if idx < len(gen_ideals) else ""
-
-        # hybrid similarity (your hybrid function)
-        try:
-            hybrid_score = hybrid_similarity(a, ideal)
-        except Exception as e:
-            hybrid_score = 0.0
-
-        # LLM grading
-        try:
-            llm_score, llm_reason, llm_best = llm_grade_answer_ollama(a, ideal)
-        except Exception as e:
-            llm_score, llm_reason, llm_best = 0.0, f"LLM failed: {e}", ""
-
-        # final score (adjust weights here)
-        final_score = round((0.6 * hybrid_score) + (0.4 * llm_score), 3)
-        tfidf_scores.append(final_score)
-
-        # highlights (common, missing, wrong)
-        common, missing, wrong = highlight_difference(ideal, a)
-        highlights.append({"common": common, "missing": missing, "wrong": wrong})
-
-        # base verdict
-        base_verdict = get_answer_verdict(a, ideal)
-        # extend verdict with LLM info and scores
-        base_verdict.update({
-            "hybrid_score": round(hybrid_score, 3),
-            "llm_score": llm_score,
-            "llm_reason": llm_reason,
-            "llm_best": llm_best,
-            "final_score": final_score
-        })
-        verdicts.append(base_verdict)
-
-    # 4) Charts & interpretation
-    st.subheader("📊 Score Summary (Hybrid + LLM)")
-    try:
-        st.pyplot(plot_bar(tfidf_scores))
-    except Exception:
-        st.write("Unable to render bar chart.")
-    st.markdown("**Interpretation:** Final score = 60% hybrid similarity + 40% LLM semantic score.")
-    try:
-        # unique key to avoid duplicate element id errors
-        st.plotly_chart(plot_line(tfidf_scores), key=f"line_chart_{random.randint(0,999999)}")
-    except Exception:
-        pass
-    try:
-        st.pyplot(plot_radar(tfidf_scores))
-    except Exception:
-        pass
-
-    # 5) Per-question display, verdict badge, LLM reasoning, flag button
-    for i, (q, a, ideal, score, hl, v) in enumerate(zip(gen_qs, answers_list, gen_ideals, tfidf_scores, highlights, verdicts)):
+    # Detailed Per-Question Display
+    for i, (q, a, ideal, score, hl) in enumerate(zip(st.session_state.questions, answers, st.session_state.ideal, tfidf_scores, highlights)):
         st.markdown(f"---\n### Q{i+1}: {q}")
-        st.write(f"**Generated Ideal:** {ideal}")
         st.write(f"**Candidate Answer:** {a}")
-        st.write(f"**Final Score:** {score:.3f}  (Hybrid: {v.get('hybrid_score')}, LLM: {v.get('llm_score')})")
-        st.success(f"✅ Matched: {hl['common']}")
-        st.warning(f"🟡 Missing: {hl['missing']}")
-        st.error(f"🔴 Extra / Wrong Info: {hl['wrong']}")
+        st.write(f"**Ideal Answer:** {ideal}")
+        st.write(f"**Score:** {score:.2f}")
+        st.success(f"✅ Positives: {hl['common']}")
+        st.error(f"❌ Negatives: {hl['missed']}")
 
-        verdict_label = v.get("verdict", "Unknown")
-        badge = {"Correct":"🟢","Partially Correct":"🟡","Copied":"🔴","Incorrect":"🔴","No Answer":"⚪"}.get(verdict_label, "❓")
-        st.markdown(f"**Verdict:** {badge} {verdict_label}")
-        st.info(f"**Explanation:** {v.get('explanation','')}")
-        st.markdown(f"**LLM Reasoning:** {v.get('llm_reason','')}")
-        if v.get("llm_best"):
-            st.markdown(f"**LLM Suggested Ideal:** {v.get('llm_best')}")
+    # --- Copyleaks AI/Plagiarism Detection ---
+    copyleaks_user_id = "17ef0379-bdb9-42e9-ab21-452f6a880925"
+    copyleaks_api_key = "c06efa2f-34ee-4bbf-97e8-c2f4fc803574"
+    access_token = get_copyleaks_access_token(copyleaks_user_id, copyleaks_api_key)
 
-        if st.button(f"🚩 Flag Suspicious (Q{i+1})", key=f"flag_{i}"):
-            flagged = st.session_state.get("flags", [])
-            flagged.append({"candidate": st.session_state.get("cand",""), "q_index": i, "question": q})
-            st.session_state["flags"] = flagged
-            st.warning(f"Q{i+1} flagged for review.")
+    copyleaks_results = []
+    if access_token:
+        for i, a in enumerate(answers):
+            sid = run_copyleaks_detection(a, access_token, copyleaks_user_id)
+            status = f"✅ Q{i+1} Submitted – Scan ID: {sid}" if sid else "❌ Submission Failed"
+            copyleaks_results.append(status)
+    else:
+        copyleaks_results = ["❌ Copyleaks Auth Failed"] * len(answers)
 
-    # 6) Save to DB (store verdicts as JSON so LLM_reason & best are persisted)
+    # Display Results
+    st.subheader("🧠 Copyleaks AI / Plagiarism Detection")
+    for i, res in enumerate(copyleaks_results):
+        st.markdown(f"**Q{i+1}:** {res}")
+
+    txt, md, html = generate_combined_report(st.session_state.cand, copyleaks_results)
+    st.download_button("📥 Copyleaks TXT", txt, file_name="copyleaks_report.txt")
+    st.download_button("📥 Copyleaks MD", md, file_name="copyleaks_report.md")
+    st.download_button("📥 Copyleaks HTML", html, file_name="copyleaks_report.html", mime="text/html")
+    st.download_button("📥 Copyleaks PDF", txt, file_name="copyleaks_report.pdf")
+    st.download_button("📥 Copyleaks JSON", txt, file_name="copyleaks_report.json")
+    st.download_button("📥 Copyleaks JPEG", txt, file_name="copyleaks_report.jpeg")
+    st.download_button("📥 Copyleaks JPG", txt, file_name="copyleaks_report.jpg")
+
+    # Save to DB
     save_interview({
-        'candidate': st.session_state.get("cand", ""),
-        'jd': jd_for_generation,
-        'questions': gen_qs,
-        'ideal': gen_ideals,
-        'answers': answers_list,
+        'candidate': st.session_state.cand,
+        'jd': st.session_state.jd,
+        'questions': st.session_state.questions,
+        'ideal': st.session_state.ideal,
+        'answers': answers,
         'scores': tfidf_scores,
-        'verdicts': verdicts,
-        'feedback': f"Role: {st.session_state.get('role','')}, Type: {st.session_state.get('qtype','')}, Mode: Ollama-Dynamic"
+        'feedback': f"Role: {st.session_state.role}, Type: {st.session_state.qtype}, Mode: {st.session_state.mode}"
     })
 
-    st.success("✅ Interview graded, saved, and LLM-checked.")
+    st.success("✅ Interview graded, saved, and Copyleaks checked.")
 
 # Tab 1: Dashboard (Aggregate view)
 with tabs[1]:
     st.header("📊 Candidate Dashboard")
     rows = load_interviews()
-
     if rows:
         selected = st.selectbox("Select Candidate", [f"{r[1]} – {r[2][:10]}" for r in rows])
         idx = [f"{r[1]} – {r[2][:10]}" for r in rows].index(selected)
-
         scores = list(map(float, rows[idx][7].split(",")))
         st.pyplot(plot_bar(scores))
         st.plotly_chart(plot_line(scores))
         st.pyplot(plot_radar(scores))
-
-        # ✅ INSERT THIS INSIDE `if rows:` ⬇️
-        verdict_list = rows[idx][8].split("\n")
-        verdict_counts = pd.Series(verdict_list).value_counts()
-
-        st.subheader("🧠 Verdict Summary")
-        st.bar_chart(verdict_counts)
-
-        fig = px.pie(
-            names=verdict_counts.index,
-            values=verdict_counts.values,
-            title="Verdict Distribution"
-        )
-        st.plotly_chart(fig)
-
     else:
         st.warning("No interviews available.")
-
-# Optional Pie Chart
-fig = px.pie(
-    names=verdict_counts.index,
-    values=verdict_counts.values,
-    title="Verdict Distribution"
-)
-st.plotly_chart(fig)
 
 # Tab 2: Reports (Export)
 with tabs[2]:
@@ -1074,19 +663,17 @@ with tabs[2]:
     if rows:
         # Build DataFrame safely
         df = pd.DataFrame([
-    {
-        "Candidate": r[1] if len(r) > 1 else "",
-        "Date": r[2][:10] if len(r) > 2 else "",
-        "JD": r[3] if len(r) > 3 else "",
-        "Questions": r[4] if len(r) > 4 else "",
-        "Ideal": r[5] if len(r) > 5 else "",
-        "Answers": r[6] if len(r) > 6 else "",
-        "Copyleaks": r[7] if len(r) > 7 else "",
-        "Scores": r[8] if len(r) > 8 else "",
-        "Verdicts": r[9] if len(r) > 9 else "",
-        "Feedback": r[10] if len(r) > 10 else ""
-    } for r in rows
-])
+            {
+                "Candidate": r[1] if len(r) > 1 else "",
+                "Date": r[2][:10] if len(r) > 2 else "",
+                "JD": r[3] if len(r) > 3 else "",
+                "Questions": r[4] if len(r) > 4 else "",
+                "Ideal": r[5] if len(r) > 5 else "",
+                "Answers": r[6] if len(r) > 6 else "",
+                "Scores": r[7] if len(r) > 7 else "",
+                "Feedback": r[8] if len(r) > 8 else ""
+            } for r in rows
+        ])
 
         if st.button("Download Report"):
             if fmt == "Excel":
@@ -1196,54 +783,3 @@ with tabs[3]:
         st.dataframe(filtered_df[["Candidate", "Timestamp", "AvgScore", "Feedback"]])
     else:
         st.warning("No interviews saved yet.")
-
-
-
-        # Core libraries
-import os
-import re
-import random
-import string
-import pandas as pd
-import numpy as np
-
-# Streamlit
-import streamlit as st
-
-# ML/NLP
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import spacy
-
-# Load SpaCy model (no internet or API key required)
-try:
-    nlp = spacy.load("en_core_web_md")  # medium-sized model
-except OSError:
-    st.error("❌ SpaCy model 'en_core_web_md' not found. Run: python -m spacy download en_core_web_md")
-    st.stop()
-
-def tfidf_cosine(text1, text2):
-    """Standard TF-IDF Cosine Similarity"""
-    vect = TfidfVectorizer().fit([text1, text2])
-    vec1 = vect.transform([text1])
-    vec2 = vect.transform([text2])
-    return cosine_similarity(vec1, vec2)[0][0]
-
-def get_cosine_similarity_spacy(text1, text2):
-    """Semantic similarity using SpaCy vectors"""
-    vec1 = nlp(text1).vector.reshape(1, -1)
-    vec2 = nlp(text2).vector.reshape(1, -1)
-    return cosine_similarity(vec1, vec2)[0][0]
-
-def hybrid_similarity(text1, text2):
-    """Weighted average of TF-IDF, Jaccard, and SpaCy semantic similarity"""
-    tfidf_score = tfidf_cosine(text1, text2)
-
-    words1 = set(text1.lower().split())
-    words2 = set(text2.lower().split())
-    jaccard_score = len(words1 & words2) / len(words1 | words2) if words1 | words2 else 0
-
-    spacy_score = get_cosine_similarity_spacy(text1, text2)
-
-    final_score = (0.4 * tfidf_score) + (0.3 * jaccard_score) + (0.3 * spacy_score)
-    return round(final_score, 4)
