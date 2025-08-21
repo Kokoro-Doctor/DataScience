@@ -202,7 +202,6 @@ The Python API provides seamless integration with existing applications and syst
 - "Show states with no active subscriptions"
 • "Find underserved markets with growth potential"
 • "Compare urban vs rural subscription patterns"
-```
 
 ### 📊 Subscription Lifecycle Analysis
 
@@ -851,7 +850,6 @@ The SQL Agent project follows a modular architecture with clearly defined compon
 **Query Pipeline**: User Input → Input Validation → AI Processing → SQL Generation → Execution → Response
      ↓             ↓                ↓              ↓              ↓          ↓
 Question → Sanitization → Gemini API → Query Building → SQLite → Results + AI Analysis
-```
 
 ### 🚀 Extensibility Points
 
@@ -861,6 +859,7 @@ Question → Sanitization → Gemini API → Query Building → SQLite → Resul
 class CustomDatabaseAgent(SQLAgent):
     def __init__(self, connection_string):
         # Your custom database logic
+```
 **Query Pipeline**: User Input → Input Validation → AI Processing → SQL Generation → Execution → Response
 
 1. **Input Validation**: Sanitize and validate natural language queries
@@ -945,7 +944,6 @@ class CustomDatabaseAgent(SQLAgent):
 
 # Check browser console for errors
 # Open browser dev tools (F12) and check console
-```
 
 #### 6. **Performance Issues**
 
@@ -1583,34 +1581,6 @@ This project uses several third-party libraries with their respective licenses:
 - **Training Workshops**: Team training on AI-SQL technologies
 - **Performance Tuning**: Optimization for large-scale deployments
 - **Custom Development**: Specialized feature development
-
-### 📧 Contact Information
-
-#### Project Maintainers
-- **Lead Developer**: [Your Name] - [your.email@domain.com]
-- **AI Specialist**: [AI Team Lead] - [ai.team@domain.com]
-- **Database Expert**: [DB Team Lead] - [db.team@domain.com]
-- **UI/UX Designer**: [Design Team] - [design.team@domain.com]
-
-#### Business Inquiries
-- **Partnerships**: [partnerships@domain.com]
-- **Licensing**: [licensing@domain.com]
-- **Media**: [media@domain.com]
-- **General**: [info@domain.com]
-
-### 🌐 Online Presence
-
-#### Official Channels
-- **GitHub Repository**: [https://github.com/your-org/sql-agent]
-- **Documentation Site**: [https://sql-agent-docs.your-domain.com]
-- **Demo Application**: [https://demo.sql-agent.your-domain.com]
-- **Blog**: [https://blog.your-domain.com/sql-agent]
-
-#### Social Media
-- **Twitter**: [@SQLAgentAI](https://twitter.com/sqlagentai)
-- **LinkedIn**: [SQL Agent Project](https://linkedin.com/company/sql-agent)
-- **YouTube**: [SQL Agent Tutorials](https://youtube.com/sqlagent)
-- **Medium**: [Technical Articles](https://medium.com/@sqlagent)
 
 ---
 
