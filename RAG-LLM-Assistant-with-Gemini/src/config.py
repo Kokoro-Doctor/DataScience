@@ -5,6 +5,10 @@ Configuration settings for the RAG LLM Assistant.
 import os
 from dotenv import load_dotenv
 
+# Set protobuf implementation to avoid compatibility issues
+# This should be set before any protobuf imports
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -13,7 +17,7 @@ class Config:
     
     # API Configuration
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-pro")
+    MODEL_NAME = os.getenv("MODEL_NAME", "gemini-1.5-pro")
     
     # Database Configuration
     DEFAULT_PERSIST_DIR = "./chroma_db"

@@ -261,8 +261,11 @@ def query_interface():
         # Database info
         st.subheader("📊 Database Schema")
         with st.expander("View Database Schema", expanded=False):
-            schema_info = agent.get_schema_info()
-            st.text(schema_info)
+            if agent is not None:
+                schema_info = agent.get_schema_info()
+                st.text(schema_info)
+            else:
+                st.error("❌ SQL Agent is not available. Cannot display schema info.")
         
         # Example queries
         st.subheader("💡 Example Questions")
@@ -309,6 +312,9 @@ def query_interface():
         
         if clear_button:
             st.session_state.selected_question = ''
+            # Clear stored results
+            if 'query_results' in st.session_state:
+                del st.session_state.query_results
             st.rerun()
     
     with col2:
@@ -347,102 +353,146 @@ def query_interface():
             st.error(f"Error loading stats: {str(e)}")
     
     # Process query
-    if query_button and user_question.strip():
-        with st.spinner("🤖 AI Agent is working on your question..."):
-            try:
-                # Get response from agent
-                response = agent.query(user_question)
-                
-                # Display SQL Query
-                st.header("🔍 Generated SQL Query")
-                st.code(response['sql_query'], language='sql')
-                
-                # Display results
-                if response['success']:
-                    st.header("📊 Query Results")
+    if query_button and user_question and user_question.strip():
+        if agent is None:
+            st.error("❌ SQL Agent is not available. Please check your configuration.")
+        else:
+            with st.spinner("🤖 AI Agent is working on your question..."):
+                try:
+                    # Get response from agent
+                    response = agent.query(user_question)
                     
-                    # Show data table if available
-                    if 'formatted_data' in response and response['formatted_data']:
-                        df = pd.DataFrame(response['formatted_data'])
+                    # Store results in session state
+                    st.session_state.query_results = {
+                        'query': user_question,
+                        'response': response
+                    }
+                    
+                    st.success("✅ Query completed!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    st.session_state.query_results = None
+    
+    elif query_button and user_question and not user_question.strip():
+        st.warning("⚠️ Please enter a question first!")
+    
+    # Display stored results from session state
+    if 'query_results' in st.session_state and st.session_state.query_results:
+        stored_data = st.session_state.query_results
+        response = stored_data['response']
+        original_query = stored_data['query']
+        
+        st.header("🔍 Generated SQL Query")
+        st.code(response['sql_query'], language='sql')
+        
+        # Display results
+        if response['success']:
+            st.header("📊 Query Results")
+            
+            # Show data table if available
+            if 'formatted_data' in response and response['formatted_data']:
+                df = pd.DataFrame(response['formatted_data'])
+                
+                # Display data summary
+                col_summary1, col_summary2, col_summary3 = st.columns(3)
+                with col_summary1:
+                    st.metric("📊 Total Rows", len(df))
+                with col_summary2:
+                    st.metric("📋 Columns", len(df.columns))
+                with col_summary3:
+                    if len(df) > 0 and df.select_dtypes(include=['number']).shape[1] > 0:
+                        numeric_cols = df.select_dtypes(include=['number']).columns
+                        st.metric("🔢 Numeric Columns", len(numeric_cols))
+                
+                # Display the data table
+                st.dataframe(df, use_container_width=True, height=400)
+                
+                # Download button
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download as CSV",
+                    data=csv,
+                    file_name=f"query_results_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
+                
+                # Optional Data Visualization
+                numeric_columns = df.select_dtypes(include=['number']).columns
+                if len(numeric_columns) > 0:
+                    st.header("📈 Data Visualization (Optional)")
+                    
+                    # Add button to show/hide visualization
+                    show_viz = st.button("� Show Data Visualization", key="show_viz_btn")
+                    
+                    if show_viz or st.session_state.get('show_visualization', False):
+                        st.session_state.show_visualization = True
                         
-                        # Display data summary
-                        col_summary1, col_summary2, col_summary3 = st.columns(3)
-                        with col_summary1:
-                            st.metric("📊 Total Rows", len(df))
-                        with col_summary2:
-                            st.metric("📋 Columns", len(df.columns))
-                        with col_summary3:
-                            if len(df) > 0 and df.select_dtypes(include=['number']).shape[1] > 0:
-                                numeric_cols = df.select_dtypes(include=['number']).columns
-                                st.metric("🔢 Numeric Columns", len(numeric_cols))
-                        
-                        # Display the data table
-                        st.dataframe(df, use_container_width=True, height=400)
-                        
-                        # Download button
-                        csv = df.to_csv(index=False)
-                        st.download_button(
-                            label="📥 Download as CSV",
-                            data=csv,
-                            file_name=f"query_results_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv"
+                        chart_type = st.selectbox(
+                            "Choose chart type:",
+                            ["Bar Chart", "Line Chart", "Area Chart", "Histogram"],
+                            key="chart_type_select"
                         )
                         
-                        # Show charts for numeric data
-                        numeric_columns = df.select_dtypes(include=['number']).columns
-                        if len(numeric_columns) > 0:
-                            st.header("📈 Data Visualization")
-                            
-                            chart_type = st.selectbox(
-                                "Choose chart type:",
-                                ["Bar Chart", "Line Chart", "Area Chart", "Histogram"]
-                            )
-                            
-                            if len(numeric_columns) >= 1:
-                                if chart_type == "Bar Chart" and len(df) <= 50:
-                                    if len(df.columns) >= 2:
-                                        x_col = st.selectbox("X-axis:", df.columns)
-                                        y_col = st.selectbox("Y-axis:", numeric_columns)
+                        if len(numeric_columns) >= 1:
+                            if chart_type == "Bar Chart" and len(df) <= 50:
+                                if len(df.columns) >= 2:
+                                    x_col = st.selectbox("X-axis:", df.columns, key="x_axis_select")
+                                    y_col = st.selectbox("Y-axis:", numeric_columns, key="y_axis_select")
+                                    if x_col and y_col:
                                         st.bar_chart(df.set_index(x_col)[y_col])
-                                
-                                elif chart_type == "Line Chart" and len(numeric_columns) >= 1:
-                                    st.line_chart(df[numeric_columns])
-                                
-                                elif chart_type == "Area Chart" and len(numeric_columns) >= 1:
-                                    st.area_chart(df[numeric_columns])
-                                
-                                elif chart_type == "Histogram":
-                                    col_hist = st.selectbox("Column for histogram:", numeric_columns)
+                            
+                            elif chart_type == "Line Chart" and len(numeric_columns) >= 1:
+                                selected_cols = st.multiselect(
+                                    "Select columns for line chart:", 
+                                    numeric_columns, 
+                                    default=list(numeric_columns[:3]),
+                                    key="line_cols_select"
+                                )
+                                if selected_cols:
+                                    st.line_chart(df[selected_cols])
+                            
+                            elif chart_type == "Area Chart" and len(numeric_columns) >= 1:
+                                selected_cols = st.multiselect(
+                                    "Select columns for area chart:", 
+                                    numeric_columns, 
+                                    default=list(numeric_columns[:3]),
+                                    key="area_cols_select"
+                                )
+                                if selected_cols:
+                                    st.area_chart(df[selected_cols])
+                            
+                            elif chart_type == "Histogram":
+                                col_hist = st.selectbox("Column for histogram:", numeric_columns, key="hist_col_select")
+                                if col_hist:
                                     st.bar_chart(df[col_hist].value_counts())
-                    
-                    else:
-                        # Non-SELECT query result
-                        query_result = response.get('query_result', {})
-                        if 'message' in query_result:
-                            st.success(query_result['message'])
-                        if 'rows_affected' in query_result:
-                            st.info(f"Rows affected: {query_result['rows_affected']}")
-                
-                else:
-                    # Display error
-                    st.header("❌ Query Error")
-                    error_msg = response.get('error', 'Unknown error occurred')
-                    st.error(f"The query failed with the following error: {error_msg}")
-                
-                # AI Explanation
-                st.header("🧠 AI Explanation")
-                st.markdown(response['explanation'])
-                
-                # Show raw response in expander for debugging
-                with st.expander("🔧 Raw Response (Debug Info)", expanded=False):
-                    st.json(response, expanded=False)
-                
-            except Exception as e:
-                st.error(f"❌ An error occurred: {str(e)}")
-                st.error(f"Traceback: {traceback.format_exc()}")
-    
-    elif query_button and not user_question.strip():
-        st.warning("⚠️ Please enter a question first!")
+                        
+                        # Button to hide visualization
+                        if st.button("🔽 Hide Visualization", key="hide_viz_btn"):
+                            st.session_state.show_visualization = False
+                            st.rerun()
+            
+            else:
+                # Non-SELECT query result
+                query_result = response.get('query_result', {})
+                if 'message' in query_result:
+                    st.success(query_result['message'])
+                if 'rows_affected' in query_result:
+                    st.info(f"Rows affected: {query_result['rows_affected']}")
+        
+        else:
+            # Display error
+            st.header("❌ Query Error")
+            error_msg = response.get('error', 'Unknown error occurred')
+            st.error(f"The query failed with the following error: {error_msg}")
+        
+        # AI Explanation
+        st.header("🧠 AI Explanation")
+        st.markdown(response['explanation'])
+        
+        # Show raw response in expander for debugging
+        with st.expander("🔧 Raw Response (Debug Info)", expanded=False):
+            st.json(response, expanded=False)
     
     # Footer
     st.markdown("---")

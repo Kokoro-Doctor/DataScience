@@ -1,6 +1,8 @@
 # RAG LLM Assistant with Enhanced Chat System
 
-A sophisticated Retrieval-Augmented Generation (RAG) system built with Streamlit, LangChain, and Google Gemini 2.5 Pro. This application provides an intelligent document processing and chat interface with advanced features including conversation history, feedback integration, and context-aware responses.
+A sophisticated Retrieval-Augmented Generation (RAG) system built with Streamlit, LangChain, and Google Gemini 1.5 Pro. This application provides an intelligent document processing and chat interface with advanced features including conversation history, feedback integration, and context-aware responses.
+
+✅ **NEW**: Built-in protobuf compatibility fix for seamless deployment!
 
 ## 🚀 Core Features
 

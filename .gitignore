@@ -147,6 +147,44 @@ docs/_build/
 .dist/
 dist/
 
+# SQL Agent specific files
+SQL_Agent/
+sql_agent/
+*.sql~
+*.sql.bak
+*.sql.backup
+query_history/
+sql_logs/
+connection_cache/
+sql_results/
+*.sqlitedb
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Database connections and credentials
+database_config.json
+db_credentials.json
+connection_strings.txt
+*.dsn
+.env.database
+.env.sql
+
+# SQL Agent cache and temporary files
+agent_cache/
+sql_cache/
+temp_queries/
+query_cache/
+execution_logs/
+
+# Database dumps and exports
+*.dump
+*.backup
+*.bak
+*.sql.gz
+exports/
+backups/
+
 # API keys and secrets
 secrets.txt
 config.ini
