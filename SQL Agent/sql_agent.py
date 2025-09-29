@@ -6,7 +6,7 @@ A powerful SQL agent that can query databases and explain results
 import sqlite3
 import os
 from pathlib import Path
-from typing import Dict, List, Any, TypedDict, Annotated
+from typing import Dict, List, Any, TypedDict, Annotated, Optional
 import pandas as pd
 import json
 import traceback
@@ -52,12 +52,18 @@ class SQLAgent:
         if not self.db_path.exists():
             raise FileNotFoundError(f"Database not found at {self.db_path}")
             
-        # Initialize Gemini model
+        # Initialize Gemini model with gemini-2.5-pro for best performance
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-exp",
+            model=model_name,
             google_api_key=GOOGLE_API_KEY,
             temperature=0.1,
+            max_retries=2,
+            request_timeout=30,
         )
+        
+        # Add rate limit tracking
+        self.rate_limited = False
         
         # Get database schema
         self.schema_info = self._get_database_schema()
@@ -183,12 +189,18 @@ IMPORTANT RULES:
 6. Use proper SQL syntax for SQLite (e.g., use || for string concatenation)
 7. When dealing with location-based queries, use the provided latitude/longitude columns
 8. For date queries, remember SQLite stores dates as TEXT in YYYY-MM-DD format
+9. PAY CLOSE ATTENTION to table names and their purpose:
+   - pcos_* tables are for PCOS (Polycystic Ovary Syndrome) medical data
+   - cardiac_arrest_dataset is for cardiac/heart medical data  
+   - earthquake_* tables are for earthquake/seismic data
+   - customers/sales_* tables are for business/commercial data
+   - Choose the RIGHT table based on what the user is asking about
 
-Example questions and approaches:
-- "Show all customers" -> SELECT * FROM customers
-- "Find active subscriptions" -> SELECT * FROM subscriptions WHERE status = 'active'
-- "Revenue by month" -> Use date functions and GROUP BY
-- "Customers in specific city" -> Use WHERE clause on city column
+TABLE SELECTION EXAMPLES:
+- "PCOS data" or "polycystic ovary" -> USE pcos_data_without_infertility_full_new
+- "cardiac" or "heart attack" -> USE cardiac_arrest_dataset  
+- "earthquake" or "seismic" -> USE earthquake_data or earthquake_1995_2023
+- "customer" or "sales" -> USE customers, sales_data, etc.
 
 User Question: {user_question}
 
@@ -209,7 +221,12 @@ SQL Query:"""
             return sql_query.strip()
             
         except Exception as e:
-            return f"Error generating SQL: {str(e)}"
+            error_msg = str(e)
+            if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                self.rate_limited = True
+                # Return a basic fallback query that works without AI
+                return "SELECT name as available_tables FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            return f"Error generating SQL: {error_msg}"
     
     def _generate_explanation(self, user_question: str, sql_query: str, query_result: Dict[str, Any]) -> str:
         """Generate explanation of the query and results"""
@@ -256,7 +273,11 @@ Keep the explanation clear, informative, and user-friendly."""
             return response.content
             
         except Exception as e:
-            return f"Error generating explanation: {str(e)}"
+            error_msg = str(e)
+            if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                self.rate_limited = True
+                return "🚫 API rate limit reached. The query executed successfully, but detailed explanation is temporarily unavailable. Please wait a moment and try again for AI insights."
+            return f"Error generating explanation: {error_msg}"
     
     def _create_agent_graph(self) -> StateGraph:
         """Create the LangGraph agent workflow"""
@@ -356,6 +377,10 @@ Please generate a corrected SQL query for: {user_question}"""
     def query(self, user_question: str) -> Dict[str, Any]:
         """Process a user question and return comprehensive results"""
         
+        # Check if we're rate limited and provide fallback
+        if self.is_rate_limited():
+            return self.get_fallback_query_result(user_question)
+        
         # Initial state
         initial_state = AgentState(
             messages=[HumanMessage(content=user_question)],
@@ -379,7 +404,8 @@ Please generate a corrected SQL query for: {user_question}"""
                 "sql_query": final_state.get("sql_query", ""),
                 "query_result": final_state.get("query_result", {}),
                 "explanation": final_state.get("explanation", ""),
-                "success": final_state.get("query_result", {}).get("success", False)
+                "success": final_state.get("query_result", {}).get("success", False),
+                "rate_limited": self.is_rate_limited()
             }
             
             # Add formatted data if available
@@ -403,9 +429,169 @@ Please generate a corrected SQL query for: {user_question}"""
                 "error": str(e)
             }
     
+    def refresh_schema(self):
+        """Refresh the database schema information"""
+        self.schema_info = self._get_database_schema()
+    
+    def is_rate_limited(self) -> bool:
+        """Check if the API is currently rate limited"""
+        return getattr(self, 'rate_limited', False)
+    
+    def reset_rate_limit_status(self):
+        """Reset the rate limit status"""
+        self.rate_limited = False
+    
+    def get_fallback_query_result(self, user_question: str) -> Dict[str, Any]:
+        """Provide a fallback response when rate limited"""
+        # Try to provide basic table information without AI
+        try:
+            tables = self.get_tables()
+            return {
+                "user_question": user_question,
+                "sql_query": "SELECT name FROM sqlite_master WHERE type='table'",
+                "query_result": {
+                    "success": True,
+                    "data": [(table,) for table in tables],
+                    "columns": ["table_name"],
+                    "message": f"Found {len(tables)} tables in database"
+                },
+                "explanation": f"🤖 AI is temporarily at capacity. Here are the available tables: {', '.join(tables)}. Please wait a moment and try your question again for full AI analysis.",
+                "success": True,
+                "rate_limited": True
+            }
+        except Exception as e:
+            return {
+                "user_question": user_question,
+                "sql_query": "",
+                "query_result": {"success": False, "error": str(e)},
+                "explanation": "🤖 AI service is temporarily at capacity. Please wait a moment and try again.",
+                "success": False,
+                "rate_limited": True
+            }
+        
     def get_schema_info(self) -> str:
         """Get formatted database schema information"""
         return self.schema_info
+        
+    def get_tables(self) -> List[str]:
+        """Get list of all tables in the database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            tables = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return tables
+        except Exception as e:
+            print(f"Error getting tables: {e}")
+            return []
+            
+    def get_table_info(self, table_name: str) -> Dict[str, Any]:
+        """Get detailed information about a specific table"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Get table schema
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = cursor.fetchall()
+            
+            # Get row count
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            row_count = cursor.fetchone()[0]
+            
+            # Get sample data
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT 3")
+            sample_data = cursor.fetchall()
+            
+            conn.close()
+            
+            return {
+                "name": table_name,
+                "columns": columns,
+                "row_count": row_count,
+                "sample_data": sample_data,
+                "column_names": [col[1] for col in columns]
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def query_with_table_filter(self, question: str, selected_tables: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Query the database with optional table filtering
+        
+        Args:
+            question: Natural language question
+            selected_tables: Optional list of tables to focus on
+            
+        Returns:
+            Query results dictionary
+        """
+        # If specific tables are selected, modify the schema info to focus on them
+        if selected_tables:
+            original_schema = self.schema_info
+            try:
+                # Create filtered schema
+                filtered_schema = self._get_filtered_schema(selected_tables)
+                self.schema_info = filtered_schema
+                
+                # Add instruction about table focus to the question
+                focused_question = f"{question}\n\nFocus on these tables: {', '.join(selected_tables)}"
+                result = self.query(focused_question)
+                
+                # Restore original schema
+                self.schema_info = original_schema
+                return result
+            except Exception as e:
+                # Restore original schema in case of error
+                self.schema_info = original_schema
+                raise e
+        else:
+            return self.query(question)
+    
+    def _get_filtered_schema(self, selected_tables: List[str]) -> str:
+        """Get schema information for only the selected tables"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            schema_info = "DATABASE SCHEMA (FILTERED):\n\n"
+            
+            for table in selected_tables:
+                # Check if table exists
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+                if not cursor.fetchone():
+                    continue
+                    
+                schema_info += f"Table: {table}\n"
+                cursor.execute(f"PRAGMA table_info({table})")
+                columns = cursor.fetchall()
+                
+                for col in columns:
+                    col_name, col_type, not_null, default, pk = col[1], col[2], col[3], col[4], col[5]
+                    constraints = []
+                    if pk:
+                        constraints.append("PRIMARY KEY")
+                    if not_null:
+                        constraints.append("NOT NULL")
+                    if default:
+                        constraints.append(f"DEFAULT {default}")
+                    
+                    constraint_str = f" ({', '.join(constraints)})" if constraints else ""
+                    schema_info += f"  - {col_name}: {col_type}{constraint_str}\n"
+                
+                # Get sample data (first 3 rows)
+                cursor.execute(f"SELECT * FROM {table} LIMIT 3")
+                sample_data = cursor.fetchall()
+                if sample_data:
+                    schema_info += f"  Sample data: {sample_data}\n"
+                
+                schema_info += "\n"
+            
+            conn.close()
+            return schema_info
+            
+        except Exception as e:
+            return f"Error getting filtered schema: {str(e)}"
 
 def main():
     """Example usage of the SQL Agent"""

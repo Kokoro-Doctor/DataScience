@@ -1,4 +1,31 @@
-# SQL Agent with Database Management
+# 🗄️ SQL Agent Database Management Guide
+
+*Complete guide for database administration, table migration, and advanced database operations*
+
+## 📋 Table of Contents
+
+1. [Overview](#overview)
+2. [Database Manager Interface](#database-manager-interface)
+3. [Table Migration Feature](#table-migration-feature)
+4. [CRUD Operations](#crud-operations)
+5. [File Upload & Dynamic Tables](#file-upload--dynamic-tables)
+6. [Database Administration](#database-administration)
+7. [Troubleshooting](#troubleshooting)
+
+---
+
+## 🎯 Overview
+
+The SQL Agent Database Manager is a comprehensive interface for managing your databases. It provides full CRUD capabilities, table migration features, file upload functionality, and advanced database administration tools.
+
+### ✨ Key Features
+
+- **Complete CRUD Operations**: Create, Read, Update, Delete records with validation
+- **🆕 Table Migration**: Move/copy tables between databases safely
+- **File Upload Support**: Create tables from CSV/Excel files instantly
+- **Advanced Search**: Filter and find records across all tables
+- **Data Validation**: Built-in validation and error handling
+- **Export Capabilities**: Download data in multiple formats
 
 This enhanced SQL Agent now includes a comprehensive database management interface alongside the original query capabilities.
 

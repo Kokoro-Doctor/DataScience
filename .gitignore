@@ -147,43 +147,105 @@ docs/_build/
 .dist/
 dist/
 
-# SQL Agent specific files
+# SQL Agent specific files and directories
 SQL_Agent/
 sql_agent/
+SQLAgent/
+sql-agent/
+agents/sql/
+sql_agents/
+
+# SQL query files and backups
 *.sql~
 *.sql.bak
 *.sql.backup
+*.sql.orig
+*.sql.tmp
+query_*.sql
+temp_*.sql
+
+# SQL Agent logs and history
 query_history/
 sql_logs/
+agent_logs/
+execution_history/
+sql_execution_logs/
+query_logs/
+connection_logs/
+
+# SQL Agent cache and working directories
 connection_cache/
 sql_results/
+results/
+sql_cache/
+agent_cache/
+temp_queries/
+query_cache/
+execution_logs/
+working_queries/
+schema_cache/
+metadata_cache/
+
+# Database files and SQLite specifics
 *.sqlitedb
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
 *.db-journal
 *.db-wal
 *.db-shm
+*.db3
+*.s3db
+*.sl3
 
 # Database connections and credentials
 database_config.json
 db_credentials.json
+db_config.json
+database_credentials.json
 connection_strings.txt
+connections.json
+db_connections.json
 *.dsn
 .env.database
 .env.sql
+.env.db
+database.env
+sql.env
 
-# SQL Agent cache and temporary files
-agent_cache/
-sql_cache/
-temp_queries/
-query_cache/
-execution_logs/
+# Database schema and migration files
+schema_dumps/
+migrations/
+sql_migrations/
+schema_backup/
+table_dumps/
 
-# Database dumps and exports
+# SQL Agent configuration files
+agent_config.json
+sql_agent_config.json
+agent_settings.json
+sql_settings.json
+query_config.json
+
+# Database dumps, exports and backups
 *.dump
 *.backup
 *.bak
 *.sql.gz
+*.sql.zip
+*.dmp
 exports/
 backups/
+sql_backups/
+db_backups/
+database_exports/
+
+# SQL Agent session and state files
+session_state/
+agent_state/
+sql_session/
+query_session/
+connection_state/
 
 # API keys and secrets
 secrets.txt

@@ -1,4 +1,15 @@
-# 🚀 Quick Start Guide
+# 🚀 SQL Agent Quick Start Guide
+
+*Get up and running with AI-powered database queries in under 5 minutes!*
+
+## 📋 Table of Contents
+- [Prerequisites](#prerequisites)
+- [Installation](#installation) 
+- [Configuration](#configuration)
+- [First Query](#first-query)
+- [Interface Options](#interface-options)
+- [Common Issues](#common-issues)
+- [Next Steps](#next-steps)
 
 ## Step 1: Get Your Gemini API Key
 

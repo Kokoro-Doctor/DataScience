@@ -1,16 +1,30 @@
-# 🤖 SQL Agent - Powered by Gemini AI & LangGraph
+# 🤖 SQL Agent - AI-Powered Database Assistant
 
-An advanced Natural Language to SQL application that transforms how you interact with databases. Built with cutting-edge AI technologies including Google's Gemini 2.0 Flash and LangGraph for intelligent query orchestration, automated error recovery, and comprehensive data analysis.
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Google Gemini](https://img.shields.io/badge/Google-Gemini%20AI-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
+[![LangGraph](https://img.shields.io/badge/LangChain-LangGraph-1C3C3C?logo=langchain&logoColor=white)](https://langchain-ai.github.io/langgraph/)
+[![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+An advanced Natural Language to SQL application that revolutionizes database interactions through cutting-edge AI. Built with Google's Gemini 2.0 Flash and LangGraph for intelligent query orchestration, automated error recovery, and comprehensive data analysis.
 
 ## 🌟 Project Overview
 
-The SQL Agent is a sophisticated database interaction system that bridges the gap between natural language and SQL queries. It enables users to query complex databases using plain English, automatically generating optimized SQL queries, executing them safely, and providing intelligent insights about the results.
+SQL Agent is a sophisticated database interaction system that bridges the gap between natural language and SQL queries. It enables users to query complex databases using plain English, automatically generating optimized SQL queries, executing them safely, and providing intelligent insights about the results.
+
+### ✨ Recent Major Updates (September 2024)
+- 🚀 **Enhanced Multi-Database Support**: Automatic detection for earthquake, cardiac arrest, customer churn, and crop recommendation databases
+- 📊 **Table Migration Feature**: Complete CRUD interface with table migration between databases
+- 🔧 **Improved Auto-Detection**: Fixed database selection issues - now works seamlessly with all available databases
+- 📈 **Advanced Analytics**: AI-powered insights and business intelligence generation
+- 🎯 **Geographic Intelligence**: Sophisticated location-based querying with Haversine distance calculations
 
 ### 🎯 Core Philosophy
-- **Accessibility**: Make database querying accessible to non-technical users
-- **Intelligence**: Leverage AI for smart query generation and data analysis
-- **Reliability**: Robust error handling and automatic query optimization
-- **Flexibility**: Multiple interfaces for different use cases and user preferences
+- **Accessibility**: Make database querying accessible to non-technical users through natural language
+- **Intelligence**: Leverage cutting-edge AI for smart query generation and comprehensive data analysis
+- **Reliability**: Robust error handling, automatic query optimization, and intelligent retry mechanisms
+- **Flexibility**: Multiple interfaces (Web, CLI, API) for different use cases and user preferences
+- **Extensibility**: Modular architecture supporting custom databases, AI models, and UI components
 
 ## ✨ Advanced Features
 
@@ -42,6 +56,7 @@ The SQL Agent is a sophisticated database interaction system that bridges the ga
 - **Streamlit Web App**: Beautiful, interactive web interface with real-time visualizations
 - **Command Line Interface**: Developer-friendly CLI for testing and automation
 - **Database Manager**: Comprehensive CRUD interface for data administration
+- **🆕 Dynamic Database Creation**: Upload CSV/Excel files to create tables instantly
 - **Python API**: Programmatic access for integration with existing systems
 
 ### 📈 Advanced Visualization
@@ -146,6 +161,17 @@ The SQL Agent is a sophisticated database interaction system that bridges the ga
 - 🗑️ **Delete Records**: Safe deletion with confirmation
 - 📊 **Table Statistics**: Real-time metrics and analysis
 - 🔍 **Custom SQL**: Execute custom queries safely
+- 🆕 **📤 File Upload**: Create dynamic tables from CSV/Excel files
+
+**🚀 NEW: Dynamic Database Creation**
+The SQL Agent now supports instant table creation from your data files:
+
+- **📊 CSV Support**: Upload CSV files to create individual tables
+- **📈 Excel Support**: Each sheet becomes a separate table automatically  
+- **🔄 Multiple Files**: Process multiple files simultaneously
+- **🧠 Smart Processing**: Automatic data type detection and column naming
+- **✅ Validation**: Comprehensive error handling and data validation
+- **🎯 Custom Naming**: Optional custom table name prefixes
 
 ### Option 4: Python API Integration
 
