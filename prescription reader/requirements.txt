@@ -1,0 +1,13 @@
+streamlit
+pandas
+langchain
+langchain-core
+langchain-openai
+openai
+streamlit
+pandas
+langchain
+langchain-core
+langchain-google-genai
+google-generativeai
+
